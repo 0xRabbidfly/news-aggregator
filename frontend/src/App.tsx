@@ -382,6 +382,9 @@ function App() {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [showUniverse, setShowUniverse] = useState(false)
 
+  // Get API URL from environment variable
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
   // Add debounced search effect
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -411,7 +414,7 @@ function App() {
   const fetchCategories = async () => {
     try {
       console.log('Fetching categories...');
-      const response = await axios.get('http://localhost:8000/api/categories');
+      const response = await axios.get(`${API_URL}/api/categories`);
       console.log('Categories received:', response.data);
       setCategories(['all', ...response.data.categories]);
     } catch (err) {
@@ -430,13 +433,23 @@ function App() {
       }
       setError(null)
       
-      const response = await axios.get<NewsResponse>('http://localhost:8000/api/news', {
+      const apiUrl = `${API_URL}/api/news`
+      console.log('Fetching news from:', apiUrl)
+      console.log('With params:', {
+        category: selectedCategory,
+        search: searchQuery || undefined,
+        page: loadMore ? currentPage + 1 : 1
+      })
+      
+      const response = await axios.get<NewsResponse>(apiUrl, {
         params: {
           category: selectedCategory,
           search: searchQuery || undefined,
           page: loadMore ? currentPage + 1 : 1
         }
       })
+      
+      console.log('Response received:', response.status)
       
       if (loadMore) {
         setNews(prev => [...prev, ...response.data.articles])
@@ -448,8 +461,14 @@ function App() {
       
       // Check if there are more results
       setHasMore(response.data.articles.length === 50)
-    } catch (err) {
-      setError('Failed to fetch news. Please try again later.')
+    } catch (err: any) {
+      console.error('Error details:', {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+        config: err.config
+      })
+      setError(err.response?.data?.detail || 'Failed to fetch news. Please try again later.')
     } finally {
       setLoading(false)
       setIsLoadingMore(false)
