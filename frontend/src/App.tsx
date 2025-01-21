@@ -417,6 +417,17 @@ function App() {
     return (saved as ViewMode) || 'card'
   })
 
+  // Add debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery) {
+        fetchNews()
+      }
+    }, 500) // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
     localStorage.setItem('darkMode', JSON.stringify(darkMode))
