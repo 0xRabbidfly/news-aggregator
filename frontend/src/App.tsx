@@ -11,51 +11,12 @@ import {
   HashtagIcon,
   ViewColumnsIcon,
   Squares2X2Icon,
-  ListBulletIcon
+  ListBulletIcon,
+  GlobeAltIcon
 } from '@heroicons/react/24/outline'
 import { BookmarkIcon as BookmarkSolidIcon } from '@heroicons/react/24/solid'
-
-interface NewsItem {
-  title: string
-  url: string
-  source: string
-  timestamp: string
-  summary: string
-  category: string
-  urlToImage?: string
-  sentiment?: {
-    polarity: number
-    subjectivity: number
-  }
-  ai_summary?: string
-  keywords?: string[]
-  content_type?: string
-  readability?: {
-    score: number
-    reading_level: string
-    avg_sentence_length: number
-  }
-  bias_analysis?: {
-    bias_level: string
-    bias_score: number
-    bias_factors: {
-      emotional: number
-      loaded_words: number
-      generalizations: number
-    }
-  }
-  key_quotes?: string[]
-}
-
-interface NewsResponse {
-  articles: NewsItem[]
-  total: number
-  category: string
-  trending_topics?: Array<{
-    topic: string
-    count: number
-  }>
-}
+import { NewsUniverse } from './NewsUniverse'
+import { NewsItem, NewsResponse } from './types'
 
 function SentimentBadge({ sentiment }: { sentiment: NewsItem['sentiment'] }) {
   if (!sentiment) return null
@@ -419,6 +380,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [showUniverse, setShowUniverse] = useState(false)
 
   // Add debounced search effect
   useEffect(() => {
@@ -538,6 +500,17 @@ function App() {
             <div className="flex items-center space-x-4">
               <ViewSwitcher currentView={viewMode} onViewChange={setViewMode} />
               <button
+                onClick={() => setShowUniverse(!showUniverse)}
+                className={`p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 ${
+                  showUniverse ? 'bg-indigo-100 dark:bg-indigo-900' : ''
+                }`}
+                title={showUniverse ? 'Hide News Universe' : 'Show News Universe'}
+              >
+                <GlobeAltIcon className={`h-6 w-6 ${
+                  showUniverse ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400'
+                }`} />
+              </button>
+              <button
                 onClick={() => setShowBookmarksOnly(!showBookmarksOnly)}
                 className={`p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 ${
                   showBookmarksOnly ? 'bg-yellow-100 dark:bg-yellow-900' : ''
@@ -607,6 +580,18 @@ function App() {
               </div>
             )}
           </div>
+
+          {/* News Universe */}
+          {showUniverse && !loading && (
+            <div className="mb-6">
+              <NewsUniverse 
+                articles={showBookmarksOnly ? bookmarks : news}
+                darkMode={darkMode}
+                onArticleClick={(article) => window.open(article.url, '_blank')}
+                onClose={() => setShowUniverse(false)}
+              />
+            </div>
+          )}
 
           {/* Trending Topics */}
           <TrendingTopics topics={news.length > 0 ? (news as any).trending_topics : undefined} />
