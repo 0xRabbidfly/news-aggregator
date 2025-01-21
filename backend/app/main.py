@@ -282,14 +282,15 @@ def generate_ai_summary(text: str, max_sentences: int = 3) -> str:
         logger.error(f"Error generating summary: {str(e)}")
         return text
 
-async def fetch_news(category: str = "general", search: Optional[str] = None) -> NewsResponse:
+async def fetch_news(category: str = "general", search: Optional[str] = None, page: int = 1) -> NewsResponse:
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             logger.info(f"Starting news fetching for category: {category}")
             params = {
                 "apiKey": NEWS_API_KEY,
                 "language": "en",
-                "pageSize": 20,
+                "pageSize": 50,
+                "page": page,
                 "category": category if category != "all" else None,
                 "q": search
             }
@@ -368,12 +369,13 @@ async def fetch_news(category: str = "general", search: Optional[str] = None) ->
 @app.get("/api/news", response_model=NewsResponse)
 async def get_news(
     category: str = Query("general", enum=CATEGORIES + ["all"]),
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    page: int = Query(1, ge=1)
 ):
     """
     Fetch news items with optional category and search filters
     """
-    return await fetch_news(category, search)
+    return await fetch_news(category, search, page)
 
 @app.get("/api/categories")
 async def get_categories():

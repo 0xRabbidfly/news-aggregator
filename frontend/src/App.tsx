@@ -416,11 +416,16 @@ function App() {
     const saved = localStorage.getItem('viewMode')
     return (saved as ViewMode) || 'card'
   })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   // Add debounced search effect
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchQuery) {
+        setCurrentPage(1) // Reset to first page on new search
+        setNews([]) // Clear existing results
         fetchNews()
       }
     }, 500) // Wait 500ms after user stops typing
@@ -454,21 +459,38 @@ function App() {
     }
   }
 
-  const fetchNews = async () => {
+  const fetchNews = async (loadMore: boolean = false) => {
     try {
-      setLoading(true)
+      if (loadMore) {
+        setIsLoadingMore(true)
+      } else {
+        setLoading(true)
+      }
       setError(null)
+      
       const response = await axios.get<NewsResponse>('http://localhost:8000/api/news', {
         params: {
           category: selectedCategory,
-          search: searchQuery || undefined
+          search: searchQuery || undefined,
+          page: loadMore ? currentPage + 1 : 1
         }
       })
-      setNews(response.data.articles)
+      
+      if (loadMore) {
+        setNews(prev => [...prev, ...response.data.articles])
+        setCurrentPage(prev => prev + 1)
+      } else {
+        setNews(response.data.articles)
+        setCurrentPage(1)
+      }
+      
+      // Check if there are more results
+      setHasMore(response.data.articles.length === 50)
     } catch (err) {
       setError('Failed to fetch news. Please try again later.')
     } finally {
       setLoading(false)
+      setIsLoadingMore(false)
     }
   }
 
@@ -477,6 +499,8 @@ function App() {
   }, [])
 
   useEffect(() => {
+    setCurrentPage(1) // Reset to first page when category changes
+    setNews([]) // Clear existing results
     console.log('Selected category changed:', selectedCategory);
     fetchNews()
   }, [selectedCategory])
@@ -493,6 +517,14 @@ function App() {
   }
 
   const isBookmarked = (url: string) => bookmarks.some(bookmark => bookmark.url === url)
+
+  const handleLoadMore = () => {
+    fetchNews(true)
+  }
+
+  const handleRefresh = () => {
+    fetchNews()
+  }
 
   return (
     <div className={`min-h-screen ${darkMode ? 'dark bg-gray-900' : 'bg-gray-100'}`}>
@@ -529,7 +561,7 @@ function App() {
                 )}
               </button>
               <button
-                onClick={fetchNews}
+                onClick={handleRefresh}
                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 <ArrowPathIcon className={`h-5 w-5 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -552,7 +584,6 @@ function App() {
                 />
                 <MagnifyingGlassIcon 
                   className="h-5 w-5 absolute right-3 top-2.5 text-gray-400 cursor-pointer"
-                  onClick={fetchNews}
                 />
               </div>
             </div>
@@ -588,147 +619,168 @@ function App() {
 
           {/* News Items */}
           <div className={`space-y-4 ${viewMode === 'compact' ? 'sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0' : ''}`}>
-            {loading ? (
+            {loading && !isLoadingMore ? (
               <div className="text-center py-12">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent"></div>
                 <div className={`mt-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Loading news...</div>
               </div>
             ) : (
-              (showBookmarksOnly ? bookmarks : news).map((item, index) => {
-                if (viewMode === 'compact') {
-                  return (
-                    <CompactNewsCard
-                      key={index}
-                      item={item}
-                      darkMode={darkMode}
-                      isBookmarked={isBookmarked(item.url)}
-                      onBookmark={() => toggleBookmark(item)}
-                    />
-                  )
-                } else if (viewMode === 'list') {
-                  return (
-                    <ListNewsItem
-                      key={index}
-                      item={item}
-                      darkMode={darkMode}
-                      isBookmarked={isBookmarked(item.url)}
-                      onBookmark={() => toggleBookmark(item)}
-                    />
-                  )
-                } else {
-                  return (
-                    <div
-                      key={index}
-                      className={`${
-                        darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50'
-                      } overflow-hidden shadow rounded-lg transition-all duration-300`}
-                    >
-                      <div className="px-4 py-5 sm:p-6">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                              {item.source}
-                            </span>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                              {item.category}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-4">
-                            <button
-                              onClick={() => toggleBookmark(item)}
-                              className="text-gray-400 hover:text-yellow-500 dark:hover:text-yellow-400"
-                            >
-                              {isBookmarked(item.url) ? (
-                                <BookmarkSolidIcon className="h-5 w-5 text-yellow-500" />
-                              ) : (
-                                <BookmarkIcon className="h-5 w-5" />
-                              )}
-                            </button>
-                            <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                              {new Date(item.timestamp).toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Sentiment Analysis */}
-                        {item.sentiment && (
-                          <div className="mt-2">
-                            <SentimentBadge sentiment={item.sentiment} />
-                          </div>
-                        )}
-
-                        {item.urlToImage && (
-                          <img
-                            src={item.urlToImage}
-                            alt={item.title}
-                            className="mt-4 w-full h-48 object-cover rounded-lg"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.style.display = 'none'
-                            }}
-                          />
-                        )}
-
-                        <a
-                          href={item.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 block"
-                        >
-                          <h3 className={`text-xl font-semibold ${
-                            darkMode ? 'text-white hover:text-indigo-400' : 'text-gray-900 hover:text-indigo-600'
-                          }`}>
-                            {item.title}
-                          </h3>
-                        </a>
-
-                        {/* Add new AI analysis components in the card view */}
-                        <div className="mt-2 space-y-2">
-                          <div className="flex items-center space-x-2">
-                            <ContentTypeBadge type={item.content_type} />
-                            <ReadabilityBadge readability={item.readability} />
-                          </div>
-                          <BiasAnalysis bias={item.bias_analysis} />
-                        </div>
-
-                        {/* AI Summary */}
-                        {item.ai_summary && (
-                          <div className="mt-2 space-y-2">
-                            <div 
-                              className="flex items-center text-sm text-gray-500 dark:text-gray-400"
-                              title="AI-generated summary of the key points in the article"
-                            >
-                              <BeakerIcon className="h-4 w-4 mr-1" />
-                              AI Summary
-                            </div>
-                            <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} text-sm`}>
-                              {item.ai_summary}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Key Quotes */}
-                        <KeyQuotes quotes={item.key_quotes} />
-
-                        {/* Keywords */}
-                        {item.keywords && item.keywords.length > 0 && (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {item.keywords.map((keyword, idx) => (
-                              <span
-                                key={idx}
-                                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-                                title="Key topic or theme identified in the article"
-                              >
-                                #{keyword}
+              <>
+                {(showBookmarksOnly ? bookmarks : news).map((item, index) => {
+                  if (viewMode === 'compact') {
+                    return (
+                      <CompactNewsCard
+                        key={index}
+                        item={item}
+                        darkMode={darkMode}
+                        isBookmarked={isBookmarked(item.url)}
+                        onBookmark={() => toggleBookmark(item)}
+                      />
+                    )
+                  } else if (viewMode === 'list') {
+                    return (
+                      <ListNewsItem
+                        key={index}
+                        item={item}
+                        darkMode={darkMode}
+                        isBookmarked={isBookmarked(item.url)}
+                        onBookmark={() => toggleBookmark(item)}
+                      />
+                    )
+                  } else {
+                    return (
+                      <div
+                        key={index}
+                        className={`${
+                          darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50'
+                        } overflow-hidden shadow rounded-lg transition-all duration-300`}
+                      >
+                        <div className="px-4 py-5 sm:p-6">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                {item.source}
                               </span>
-                            ))}
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                {item.category}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                              <button
+                                onClick={() => toggleBookmark(item)}
+                                className="text-gray-400 hover:text-yellow-500 dark:hover:text-yellow-400"
+                              >
+                                {isBookmarked(item.url) ? (
+                                  <BookmarkSolidIcon className="h-5 w-5 text-yellow-500" />
+                                ) : (
+                                  <BookmarkIcon className="h-5 w-5" />
+                                )}
+                              </button>
+                              <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                {new Date(item.timestamp).toLocaleString()}
+                              </span>
+                            </div>
                           </div>
-                        )}
+
+                          {/* Sentiment Analysis */}
+                          {item.sentiment && (
+                            <div className="mt-2">
+                              <SentimentBadge sentiment={item.sentiment} />
+                            </div>
+                          )}
+
+                          {item.urlToImage && (
+                            <img
+                              src={item.urlToImage}
+                              alt={item.title}
+                              className="mt-4 w-full h-48 object-cover rounded-lg"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.style.display = 'none'
+                              }}
+                            />
+                          )}
+
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 block"
+                          >
+                            <h3 className={`text-xl font-semibold ${
+                              darkMode ? 'text-white hover:text-indigo-400' : 'text-gray-900 hover:text-indigo-600'
+                            }`}>
+                              {item.title}
+                            </h3>
+                          </a>
+
+                          {/* Add new AI analysis components in the card view */}
+                          <div className="mt-2 space-y-2">
+                            <div className="flex items-center space-x-2">
+                              <ContentTypeBadge type={item.content_type} />
+                              <ReadabilityBadge readability={item.readability} />
+                            </div>
+                            <BiasAnalysis bias={item.bias_analysis} />
+                          </div>
+
+                          {/* AI Summary */}
+                          {item.ai_summary && (
+                            <div className="mt-2 space-y-2">
+                              <div 
+                                className="flex items-center text-sm text-gray-500 dark:text-gray-400"
+                                title="AI-generated summary of the key points in the article"
+                              >
+                                <BeakerIcon className="h-4 w-4 mr-1" />
+                                AI Summary
+                              </div>
+                              <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} text-sm`}>
+                                {item.ai_summary}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Key Quotes */}
+                          <KeyQuotes quotes={item.key_quotes} />
+
+                          {/* Keywords */}
+                          {item.keywords && item.keywords.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {item.keywords.map((keyword, idx) => (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                                  title="Key topic or theme identified in the article"
+                                >
+                                  #{keyword}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )
-                }
-              })
+                    )
+                  }
+                })}
+                
+                {!showBookmarksOnly && hasMore && (
+                  <div className="text-center py-4">
+                    <button
+                      onClick={handleLoadMore}
+                      disabled={isLoadingMore}
+                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                    >
+                      {isLoadingMore ? (
+                        <>
+                          <div className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                          Loading more...
+                        </>
+                      ) : (
+                        'Load More'
+                      )}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
