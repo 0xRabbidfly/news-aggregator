@@ -633,13 +633,121 @@ function App() {
                 {(showBookmarksOnly ? bookmarks : news).map((item, index) => {
                   if (viewMode === 'compact') {
                     return (
-                      <CompactNewsCard
+                      <div
                         key={index}
-                        item={item}
-                        darkMode={darkMode}
-                        isBookmarked={isBookmarked(item.url)}
-                        onBookmark={() => toggleBookmark(item)}
-                      />
+                        className={`${
+                          darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50'
+                        } overflow-hidden shadow rounded-lg transition-all duration-300`}
+                      >
+                        <div className="px-4 py-5 sm:p-6">
+                          <div className="flex flex-col md:flex-row md:space-x-6">
+                            {item.urlToImage && (
+                              <div className="md:w-1/3 flex-shrink-0">
+                                <img
+                                  src={item.urlToImage}
+                                  alt={item.title}
+                                  className="w-full h-48 object-cover bg-gray-50 dark:bg-gray-900 rounded-lg"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement
+                                    target.style.display = 'none'
+                                  }}
+                                />
+                              </div>
+                            )}
+                            
+                            <div className="flex-1 mt-4 md:mt-0">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                    {item.source}
+                                  </span>
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                    {item.category}
+                                  </span>
+                                </div>
+                                <div className="flex items-center space-x-4">
+                                  <button
+                                    onClick={() => toggleBookmark(item)}
+                                    className="text-gray-400 hover:text-yellow-500 dark:hover:text-yellow-400"
+                                  >
+                                    {isBookmarked(item.url) ? (
+                                      <BookmarkSolidIcon className="h-5 w-5 text-yellow-500" />
+                                    ) : (
+                                      <BookmarkIcon className="h-5 w-5" />
+                                    )}
+                                  </button>
+                                  <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                    {new Date(item.timestamp).toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Sentiment Analysis */}
+                              {item.sentiment && (
+                                <div className="mt-2">
+                                  <SentimentBadge sentiment={item.sentiment} />
+                                </div>
+                              )}
+
+                              <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 block"
+                              >
+                                <h3 className={`text-xl font-semibold ${
+                                  darkMode ? 'text-white hover:text-indigo-400' : 'text-gray-900 hover:text-indigo-600'
+                                }`}>
+                                  {item.title}
+                                </h3>
+                              </a>
+
+                              {/* Add new AI analysis components in the card view */}
+                              <div className="mt-2 space-y-2">
+                                <div className="flex items-center space-x-2">
+                                  <ContentTypeBadge type={item.content_type} />
+                                  <ReadabilityBadge readability={item.readability} />
+                                </div>
+                                <BiasAnalysis bias={item.bias_analysis} />
+                              </div>
+
+                              {/* AI Summary */}
+                              {item.ai_summary && (
+                                <div className="mt-2 space-y-2">
+                                  <div 
+                                    className="flex items-center text-sm text-gray-500 dark:text-gray-400"
+                                    title="AI-generated summary of the key points in the article"
+                                  >
+                                    <BeakerIcon className="h-4 w-4 mr-1" />
+                                    AI Summary
+                                  </div>
+                                  <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} text-sm`}>
+                                    {item.ai_summary}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Key Quotes */}
+                              <KeyQuotes quotes={item.key_quotes} />
+
+                              {/* Keywords */}
+                              {item.keywords && item.keywords.length > 0 && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {item.keywords.map((keyword, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                                      title="Key topic or theme identified in the article"
+                                    >
+                                      #{keyword}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     )
                   } else if (viewMode === 'list') {
                     return (
@@ -660,106 +768,112 @@ function App() {
                         } overflow-hidden shadow rounded-lg transition-all duration-300`}
                       >
                         <div className="px-4 py-5 sm:p-6">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                {item.source}
-                              </span>
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                                {item.category}
-                              </span>
-                            </div>
-                            <div className="flex items-center space-x-4">
-                              <button
-                                onClick={() => toggleBookmark(item)}
-                                className="text-gray-400 hover:text-yellow-500 dark:hover:text-yellow-400"
-                              >
-                                {isBookmarked(item.url) ? (
-                                  <BookmarkSolidIcon className="h-5 w-5 text-yellow-500" />
-                                ) : (
-                                  <BookmarkIcon className="h-5 w-5" />
-                                )}
-                              </button>
-                              <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                {new Date(item.timestamp).toLocaleString()}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Sentiment Analysis */}
-                          {item.sentiment && (
-                            <div className="mt-2">
-                              <SentimentBadge sentiment={item.sentiment} />
-                            </div>
-                          )}
-
-                          {item.urlToImage && (
-                            <img
-                              src={item.urlToImage}
-                              alt={item.title}
-                              className="mt-4 w-full h-48 object-cover rounded-lg"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement
-                                target.style.display = 'none'
-                              }}
-                            />
-                          )}
-
-                          <a
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-2 block"
-                          >
-                            <h3 className={`text-xl font-semibold ${
-                              darkMode ? 'text-white hover:text-indigo-400' : 'text-gray-900 hover:text-indigo-600'
-                            }`}>
-                              {item.title}
-                            </h3>
-                          </a>
-
-                          {/* Add new AI analysis components in the card view */}
-                          <div className="mt-2 space-y-2">
-                            <div className="flex items-center space-x-2">
-                              <ContentTypeBadge type={item.content_type} />
-                              <ReadabilityBadge readability={item.readability} />
-                            </div>
-                            <BiasAnalysis bias={item.bias_analysis} />
-                          </div>
-
-                          {/* AI Summary */}
-                          {item.ai_summary && (
-                            <div className="mt-2 space-y-2">
-                              <div 
-                                className="flex items-center text-sm text-gray-500 dark:text-gray-400"
-                                title="AI-generated summary of the key points in the article"
-                              >
-                                <BeakerIcon className="h-4 w-4 mr-1" />
-                                AI Summary
+                          <div className="flex flex-col md:flex-row md:space-x-6">
+                            {item.urlToImage && (
+                              <div className="md:w-1/3 flex-shrink-0">
+                                <img
+                                  src={item.urlToImage}
+                                  alt={item.title}
+                                  className="w-full h-48 object-cover bg-gray-50 dark:bg-gray-900 rounded-lg"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement
+                                    target.style.display = 'none'
+                                  }}
+                                />
                               </div>
-                              <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} text-sm`}>
-                                {item.ai_summary}
-                              </p>
-                            </div>
-                          )}
+                            )}
+                            
+                            <div className="flex-1 mt-4 md:mt-0">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                    {item.source}
+                                  </span>
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                    {item.category}
+                                  </span>
+                                </div>
+                                <div className="flex items-center space-x-4">
+                                  <button
+                                    onClick={() => toggleBookmark(item)}
+                                    className="text-gray-400 hover:text-yellow-500 dark:hover:text-yellow-400"
+                                  >
+                                    {isBookmarked(item.url) ? (
+                                      <BookmarkSolidIcon className="h-5 w-5 text-yellow-500" />
+                                    ) : (
+                                      <BookmarkIcon className="h-5 w-5" />
+                                    )}
+                                  </button>
+                                  <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                    {new Date(item.timestamp).toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
 
-                          {/* Key Quotes */}
-                          <KeyQuotes quotes={item.key_quotes} />
+                              {/* Sentiment Analysis */}
+                              {item.sentiment && (
+                                <div className="mt-2">
+                                  <SentimentBadge sentiment={item.sentiment} />
+                                </div>
+                              )}
 
-                          {/* Keywords */}
-                          {item.keywords && item.keywords.length > 0 && (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {item.keywords.map((keyword, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-                                  title="Key topic or theme identified in the article"
-                                >
-                                  #{keyword}
-                                </span>
-                              ))}
+                              <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 block"
+                              >
+                                <h3 className={`text-xl font-semibold ${
+                                  darkMode ? 'text-white hover:text-indigo-400' : 'text-gray-900 hover:text-indigo-600'
+                                }`}>
+                                  {item.title}
+                                </h3>
+                              </a>
+
+                              {/* Add new AI analysis components in the card view */}
+                              <div className="mt-2 space-y-2">
+                                <div className="flex items-center space-x-2">
+                                  <ContentTypeBadge type={item.content_type} />
+                                  <ReadabilityBadge readability={item.readability} />
+                                </div>
+                                <BiasAnalysis bias={item.bias_analysis} />
+                              </div>
+
+                              {/* AI Summary */}
+                              {item.ai_summary && (
+                                <div className="mt-2 space-y-2">
+                                  <div 
+                                    className="flex items-center text-sm text-gray-500 dark:text-gray-400"
+                                    title="AI-generated summary of the key points in the article"
+                                  >
+                                    <BeakerIcon className="h-4 w-4 mr-1" />
+                                    AI Summary
+                                  </div>
+                                  <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} text-sm`}>
+                                    {item.ai_summary}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Key Quotes */}
+                              <KeyQuotes quotes={item.key_quotes} />
+
+                              {/* Keywords */}
+                              {item.keywords && item.keywords.length > 0 && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {item.keywords.map((keyword, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                                      title="Key topic or theme identified in the article"
+                                    >
+                                      #{keyword}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          )}
+                          </div>
                         </div>
                       </div>
                     )

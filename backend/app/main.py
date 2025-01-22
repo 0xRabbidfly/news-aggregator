@@ -128,14 +128,46 @@ def analyze_content_type(text: str) -> str:
 def calculate_readability_score(text: str) -> Dict[str, Any]:
     """Calculate text readability metrics."""
     try:
+        # Handle empty or very short text
+        if not text or len(text.strip()) < 10:
+            return {
+                "score": 60.0,
+                "reading_level": "standard",
+                "avg_sentence_length": 20.0
+            }
+
         sentences = sent_tokenize(text)
-        words = text.split()
-        syllable_count = sum(len(TextBlob(word).words[0].split('-')) for word in words)
+        if not sentences:  # If no sentences were found
+            return {
+                "score": 60.0,
+                "reading_level": "standard",
+                "avg_sentence_length": 20.0
+            }
+
+        words = [word for word in text.split() if word.strip()]  # Filter out empty strings
+        if not words:  # If no words were found
+            return {
+                "score": 60.0,
+                "reading_level": "standard",
+                "avg_sentence_length": 20.0
+            }
+
+        # Calculate syllables more safely
+        def count_syllables(word: str) -> int:
+            try:
+                return len(TextBlob(word).words[0].split('-'))
+            except:
+                return 1  # Fallback to 1 syllable if analysis fails
+
+        syllable_count = sum(count_syllables(word) for word in words)
         
-        # Calculate Flesch Reading Ease score
+        # Calculate metrics
         words_per_sentence = len(words) / len(sentences)
         syllables_per_word = syllable_count / len(words)
         flesch_score = 206.835 - 1.015 * words_per_sentence - 84.6 * syllables_per_word
+        
+        # Ensure score is within reasonable bounds
+        flesch_score = max(0, min(100, flesch_score))
         
         reading_level = "advanced"
         if flesch_score > 80:
@@ -310,28 +342,42 @@ async def fetch_news(category: str = "general", search: Optional[str] = None, pa
             
             for article in data.get("articles", []):
                 try:
-                    # Combine title and description for analysis
-                    full_text = f"{article['title']} {article.get('description', '')}"
+                    # Skip articles with missing required fields
+                    if not article.get("title") or not article.get("url"):
+                        logger.warning("Skipping article with missing required fields")
+                        continue
+
+                    # Safely get text for analysis
+                    title = article.get("title", "").strip()
+                    description = article.get("description", "").strip()
+                    full_text = f"{title} {description}".strip()
+                    
+                    # Skip articles with insufficient text
+                    if len(full_text) < 10:
+                        logger.warning("Skipping article with insufficient text")
+                        continue
+
                     all_text += f" {full_text}"
                     
-                    # Analyze sentiment and generate AI summary
+                    # Analyze sentiment and generate AI summary with proper fallbacks
                     sentiment = analyze_sentiment(full_text)
-                    ai_summary = generate_ai_summary(article.get('description', '') or article['title'])
+                    ai_summary = generate_ai_summary(description or title)
                     keywords = extract_keywords(full_text)
                     
-                    # New AI analysis features
+                    # New AI analysis features with proper error handling
                     content_type = analyze_content_type(full_text)
                     readability = calculate_readability_score(full_text)
                     bias_analysis = detect_bias(full_text)
-                    key_quotes = extract_key_quotes(article.get('description', '') or article['title'])
+                    key_quotes = extract_key_quotes(description or title)
                     
+                    # Create news item with proper defaults
                     news_items.append(
                         NewsItem(
-                            title=article["title"],
+                            title=title,
                             url=article["url"],
-                            source=article["source"]["name"],
-                            timestamp=article["publishedAt"],
-                            summary=article["description"] or "",
+                            source=article.get("source", {}).get("name", "Unknown Source"),
+                            timestamp=article.get("publishedAt", datetime.now().isoformat()),
+                            summary=description or "",
                             category=category,
                             urlToImage=article.get("urlToImage"),
                             sentiment=sentiment,
@@ -343,11 +389,21 @@ async def fetch_news(category: str = "general", search: Optional[str] = None, pa
                             key_quotes=key_quotes
                         )
                     )
-                    logger.info(f"Added article: {article['title']}")
+                    logger.info(f"Added article: {title}")
                 except Exception as e:
                     logger.error(f"Error processing article: {str(e)}")
                     continue
             
+            # Handle case where no articles were successfully processed
+            if not news_items:
+                logger.warning("No articles were successfully processed")
+                return NewsResponse(
+                    articles=[],
+                    total=0,
+                    category=category,
+                    trending_topics=[]
+                )
+
             # Analyze trending topics
             trending_topics = extract_keywords(all_text, n=10)
             trending_with_count = [
